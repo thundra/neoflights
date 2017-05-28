@@ -18,6 +18,12 @@ MERGE (ap:Airport {code: row.Code})
 
 // load the flights (called legs by Max)
 LOAD CSV WITH HEADERS FROM 'file:///newflights/flights.csv' AS row
+WITH row, apoc.date.parse(row.EffectiveDate,"d", "M/dd/yy") AS effectiveDate,
+     apoc.date.parse(row.DiscontinueDate,"d", "M/dd/yy") AS discountinueDate
+
+WITH row,effectiveDate,discountinueDate,
+     apoc.date.fields(apoc.date.format(effectiveDate, 'd', 'yyyy/MM/dd'),'yyyy/MM/dd') as mydate
+
 WITH row.DepartureCity AS departureCity,
      row.ArrivalCity AS arrivalCity,
      row.DepartureTime AS departureTime,
@@ -25,20 +31,23 @@ WITH row.DepartureCity AS departureCity,
      apoc.number.format(tointeger(row.DepartureTimezone), '0000') AS departureTimezone,
      row.ArrivalTimezone AS arrivalTimezone,
      row.AirlineCode AS airlineCode,
-     row.EffectiveDate AS effectiveDate,
      row.FlightNumber AS flightNumber,
-     coalesce(row.DayOfOperationMonday, 1) AS dayMonday,
-     coalesce(row.DayOfOperationTuesday, 2) AS dayTuesday,
-     coalesce(row.DayOfOperationWednesday, 3) AS dayWednesday,
-     coalesce(row.DayOfOperationThursday, 4) AS dayThursday,
-     coalesce(row.DayOfOperationFriday, 5) AS dayFriday,
-     coalesce(row.DayOfOperationSaturday, 6) AS daySaturday,
-     coalesce(row.DayOfOperationSunday, 7) AS daySunday,
-     row.DiscontinueDate AS discountInueDate,
+     [row.DayOfOperationMonday, row.DayOfOperationTuesday,
+       row.DayOfOperationWednesday,row.DayOfOperationThursday,row.DayOfOperationFriday,
+       row.DayOfOperationSaturday,row.DayOfOperationSunday] as daysofoperation,
+     row.DiscontinueDate as endDate,
+     row.EffectiveDate as startDate,
+     discountinueDate as endDateDays,
+     effectiveDate as startDateDays,
+     discountinueDate - effectiveDate as daysActive,
+     mydate.weekdays as activeWeekDay,
      row.ScheduleEffectiveDate AS scheduleEffectiveDate,
-     row.VariationDepartureTimeCode AS variationDepartureTimeCode,
-     row.VariationArrivalTimeCode  AS variationsArrivalTimeCode,
+     toInteger(row.VariationDepartureTimeCode) AS variationDepartureTimeCode,
+     toInteger(row.VariationArrivalTimeCode)  AS variationsArrivalTimeCode,
      row.FlightDistance AS flightDistance
+
+//FOREACH (i IN RANGE(0, daysActive) |
+//    )
 
   LIMIT 10
 
@@ -47,6 +56,9 @@ RETURN *
 
 WITH '20' AS timetest
 RETURN apoc.number.format(tointeger(timetest),'0000') AS convertedtime
+
+with apoc.date.parse("4/27/2016","s", "M/dd/yyyy") as date
+return date
 
 
 WITH  row.DepartureCity AS departureCity
@@ -85,3 +97,11 @@ SET r.distance = avg_distance, r.flights = flights
 CALL com.maxdemarzi.generateSchema();
 CALL com.maxdemarzi.import.airports("/Users/mfkilgore/IdeaProjects/ic/neoflights/src/main/resources/data/airports.csv")
 CALL com.maxdemarzi.import.flights("/Users/mfkilgore/IdeaProjects/ic/neoflights/src/main/resources/data/flights.csv")
+
+with apoc.date.format(16921, 'd', 'yyyy/MM/dd') as fdate
+with fdate,apoc.date.fields(fdate,'yyyy/MM/dd') as mydate
+return fdate,mydate.weekdays
+
+
+with apoc.date.fields("12/27/16", "M/dd/yy") as date
+return date.months
