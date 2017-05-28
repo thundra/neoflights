@@ -20,7 +20,7 @@ public class ImportAirportsTest {
             .withProcedure(Schema.class)
             .withProcedure(Imports.class);
 
-    @Test
+    //@Test
     public void shouldImportAirports() {
         HTTP.POST(neo4j.httpURI().resolve("/db/data/transaction/commit").toString(), SCHEMA);
         HTTP.Response response = HTTP.POST(neo4j.httpURI().resolve("/db/data/transaction/commit").toString(), QUERY);
