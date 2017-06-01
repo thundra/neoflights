@@ -1,3 +1,21 @@
+//create the schema
+CREATE  CONSTRAINT ON (ap:Airport) ASSERT ap.code IS UNIQUE
+CREATE  CONSTRAINT ON (aday:AirportDay) ASSERT aday.key IS UNIQUE
+
+// load the airports
+LOAD CSV WITH HEADERS FROM 'file:///newflights/airports.csv' AS row
+WITH row, tofloat(row.Lat) AS lat, tofloat(row.Lon) AS lon
+
+MERGE (ap:Airport {code: row.Code})
+  ON CREATE
+  SET ap.country = row.Country,
+  ap.latitude = row.Latitude,
+  ap.longitude = row.Longitude,
+  ap.lat = lat,
+  ap.lon = lon,
+  ap.name = row.name
+
+
 LOAD CSV WITH HEADERS FROM 'file:///newflights/flights.csv' AS row
 WITH row, apoc.date.parse(row.EffectiveDate,"d", "M/dd/yy") AS effectiveDate,
      apoc.date.parse(row.DiscontinueDate,"d", "M/dd/yy") AS discountinueDate
@@ -52,4 +70,16 @@ return *   limit 10
 
 
 
-return apoc.date.format(1462076400,"s","yyyy/MM/dd HHmm")
+// final connect up the aiports
+MATCH (a1:Airport)-[:HAS_DAY]->(ad1:AirportDay)-->
+(l:Leg)-->(ad2:AirportDay)<-[:HAS_DAY]-(a2:Airport)
+  WHERE a1 <> a2
+WITH a1,  AVG(l.distance) AS avg_distance, a2, COUNT(*) AS flights
+MERGE (a1)-[r:FLIES_TO]->(a2)
+SET r.distance = avg_distance, r.flights = flights
+
+
+// calling max code
+CALL com.maxdemarzi.generateSchema();
+CALL com.maxdemarzi.import.airports("/Users/mfkilgore/IdeaProjects/ic/neoflights/src/main/resources/data/airports.csv")
+CALL com.maxdemarzi.import.flights("/Users/mfkilgore/IdeaProjects/ic/neoflights/src/main/resources/data/flights.csv")

@@ -96,7 +96,8 @@ def flights():
 
         departurelocaltime = datetime.strptime(departuretime, "%H%M")
         discontinueDate = datetime.strptime(row.DiscontinueDate, "%m/%d/%y")
-        fulldiscontinueDate = discontinueDate + timedelta(hours=departurelocaltime.hour, minutes=departurelocaltime.minute)
+        fulldiscontinueDate = discontinueDate + timedelta(hours=departurelocaltime.hour,
+                                                          minutes=departurelocaltime.minute)
         print(effectivedate)
 
         daysOfOperation = []
@@ -119,7 +120,7 @@ def flights():
 
         daysBetween = discontinueDate - effectivedate
 
-        print (daysBetween)
+        print(daysBetween)
         nextdate = effectivedate
         for i in range(daysBetween.days):
             # add if days of service
@@ -134,45 +135,44 @@ def flights():
             departureKey = row.DepartureCity + "-" + '{0:%Y-%m-%d}'.format(departure)
             print(departureKey)
             arrivalKey = row.ArrivalCity + "-" + '{0:%Y-%m-%d}'.format(arrival)
-            print (arrivalKey)
-            try:
-                result = session.run(airportday, {'key': departureKey})
-                summary = result.summary()
-                print('Counters: ', summary.counters)
-            except Exception as e:
-                print('general error ', e)
-            try:
-                result = session.run(airportday, {'key': arrivalKey})
-                summary = result.summary()
-                print('Counters: ', summary.counters)
-            except Exception as e:
-                print('general error ', e)
-            try:
-                result = session.run(airport_airportday, {'code': row.DepartureCity,'key': departureKey})
-                summary = result.summary()
-                print('Counters: ', summary.counters)
-            except Exception as e:
-                print('general error ', e)
-            try:
-                result = session.run(airport_airportday, {'code': row.ArrivalCity,'key': arrivalKey})
-                summary = result.summary()
-                print('Counters: ', summary.counters)
-            except Exception as e:
-                print('general error ', e)
-            try:
-                result = session.run(leg, {'code': row.AirlineCode+"-"+str(row.FlightNumber),
-                                           'departs': '{0:%Y-%m-%d %H:%M}'.format(departure),
-                                           'arrives': '{0:%Y-%m-%d %H:%M}'.format(arrival),
-                                           'keyArrives': arrivalKey,
-                                           'keyDeparts': departureKey,
-                                           'reltype': row.ArrivalCity + '_FLIGHT',
-                                           'distance': row.FlightDistance})
-                summary = result.summary()
-                print('Counters: ', summary.counters)
-            except Exception as e:
-                print('general error ', e)
-
-
+            print(arrivalKey)
+            with session.begin_transaction() as tx:
+                try:
+                    result = tx.run(airportday, {'key': departureKey})
+                    summary = result.summary()
+                    print('Counters: ', summary.counters)
+                except Exception as e:
+                    print('general error ', e)
+                try:
+                    result = tx.run(airportday, {'key': arrivalKey})
+                    summary = result.summary()
+                    print('Counters: ', summary.counters)
+                except Exception as e:
+                    print('general error ', e)
+                try:
+                    result = tx.run(airport_airportday, {'code': row.DepartureCity, 'key': departureKey})
+                    summary = result.summary()
+                    print('Counters: ', summary.counters)
+                except Exception as e:
+                    print('general error ', e)
+                try:
+                    result = tx.run(airport_airportday, {'code': row.ArrivalCity, 'key': arrivalKey})
+                    summary = result.summary()
+                    print('Counters: ', summary.counters)
+                except Exception as e:
+                    print('general error ', e)
+                try:
+                    result = tx.run(leg, {'code': row.AirlineCode + "-" + str(row.FlightNumber),
+                                               'departs': '{0:%Y-%m-%d %H:%M}'.format(departure),
+                                               'arrives': '{0:%Y-%m-%d %H:%M}'.format(arrival),
+                                               'keyArrives': arrivalKey,
+                                               'keyDeparts': departureKey,
+                                               'reltype': row.ArrivalCity + '_FLIGHT',
+                                               'distance': row.FlightDistance})
+                    summary = result.summary()
+                    print('Counters: ', summary.counters)
+                except Exception as e:
+                    print('general error ', e)
 
 
 main()
