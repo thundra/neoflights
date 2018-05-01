@@ -1,3 +1,37 @@
+/**
+ * carrier
+ flightnumber
+ departureAirport
+ departureCity
+ departureState,
+ departureCountry,
+ departureTimePub,
+ departureUTCVariance,
+ departureTerminal,
+ arrivalAirport,
+ arrivalCity,
+ arrivalState,
+ arrivalCountry,
+ arrivalTimePub,
+ arrivalUTCVariance,
+ arrivalTerminal,
+ subAircraftCode,
+ classes,
+ flightArrivalDayIndicator,
+ stops,
+ stopCodes,
+ flightDistance,
+ elapsedTime,
+ codeshareIndicator,
+ departureAirportName,
+ departureCityName,
+ departureCountryName,
+ arrivalAirportName,
+ arrivalCityName,
+ arrivalCountryName,
+ FlightAvailability
+ */
+
 package com.maxdemarzi;
 
 import com.maxdemarzi.results.StringResult;
@@ -10,17 +44,14 @@ import org.neo4j.kernel.internal.GraphDatabaseAPI;
 import org.neo4j.logging.Log;
 import org.neo4j.procedure.*;
 
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.Reader;
+import java.io.*;
 import java.sql.Timestamp;
 import java.time.*;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class Imports {
 
@@ -231,5 +262,190 @@ public class Imports {
         long timeTaken = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start);
 
         return Stream.of(new StringResult(count + " Flights imported in " + timeTaken + " Seconds"));
+    }
+
+    @Description("com.maxdemarzi.import.airports(file) | Import Airports")
+    @Procedure(name = "com.maxdemarzi.import.importOneFileData", mode = Mode.WRITE)
+
+    public Stream<StringResult> importOneFileData(@Name("file") String file) throws IOException {
+        long start = System.nanoTime();
+        Reader in = new FileReader("/" + file);
+        Iterable<CSVRecord> records = CSVFormat.EXCEL.withHeader().parse(in);
+        Map<String, Map<String, String>> airports = new HashMap<>();
+
+        Transaction tx = db.beginTx();
+        int count = 0;
+        try {
+
+            for (CSVRecord record : records) {
+                count++;
+
+                // Airports
+                String departureCity = record.get("departureCity");
+                String arrivalCity = record.get("arrivalCity");
+                db.execute("MERGE (a:Airport {code:{code}})",
+                        Collections.singletonMap("code", departureCity));
+                db.execute("MERGE (a:Airport {code:{code}})",
+                        Collections.singletonMap("code", arrivalCity));
+
+                // Legs and AirportDays
+                String airlineCode = record.get("carrier");
+                String flightNumber = record.get("flightnumber");
+//                String departureTime = String.format("%04d", Integer.parseInt(record.get("departureTimePub")));
+//                String arrivalTime = String.format("%04d", Integer.parseInt(record.get("arrivalTimePub")));
+                String variationDepartureTimeCode = record.get("departureUTCVariance");
+                String variationArrivalTimeCode = record.get("arrivalUTCVariance");
+
+                Integer variationDepartureTimeCodeOffset = Integer.parseInt(variationDepartureTimeCode);
+                Integer variationArrivalTimeCodeOffset = Integer.parseInt(variationArrivalTimeCode);
+
+                LocalTime departureLocalTime = LocalTime.parse(
+                        record.get("departureTimePub"),
+                        DateTimeFormatter.ofPattern("HH:mm:ss"));
+
+                LocalTime arrivalLocalTime = LocalTime.parse(
+                        record.get("arrivalTimePub"),
+                        DateTimeFormatter.ofPattern("HH:mm:ss"));
+                String departureTimezone = String.format("%+05d", Integer.parseInt(record.get("departureUTCVariance")));
+                String arrivalTimezone = String.format("%+05d", Integer.parseInt(record.get("arrivalUTCVariance")));
+
+                ZoneOffset departureZoneOffset = ZoneOffset.of(
+                        departureTimezone.substring(0, 3) +
+                                ":" +
+                                departureTimezone.substring(3, 5));
+
+                ZoneOffset arrivalZoneOffset = ZoneOffset.of(
+                        arrivalTimezone.substring(0, 3) +
+                                ":" +
+                                arrivalTimezone.substring(3, 5));
+
+                String dayOfOperationMonday = null;
+                String dayOfOperationTuesday = null;
+                String dayOfOperationWednesday = null;
+                String dayOfOperationThursday = null;
+                String dayOfOperationFriday = null;
+                String dayOfOperationSaturday = null;
+                String dayOfOperationSunday = null;
+
+                if (record.toMap().containsKey("dayOfOperationMonday"))
+                    dayOfOperationMonday = record.get("DayOfOperationMonday");
+                if (record.toMap().containsKey("DayOfOperationTuesday"))
+                    dayOfOperationTuesday = record.get("DayOfOperationTuesday");
+                if (record.toMap().containsKey("DayOfOperationWednesday"))
+                    dayOfOperationWednesday = record.get("DayOfOperationWednesday");
+                if (record.toMap().containsKey("DayOfOperationThursday"))
+                    dayOfOperationThursday = record.get("DayOfOperationThursday");
+                if (record.toMap().containsKey("DayOfOperationFriday"))
+                    dayOfOperationFriday = record.get("DayOfOperationFriday");
+                if (record.toMap().containsKey("DayOfOperationSaturday"))
+                    dayOfOperationSaturday = record.get("DayOfOperationSaturday");
+                if (record.toMap().containsKey("DayOfOperationSunday"))
+                    dayOfOperationSunday = record.get("DayOfOperationSunday");
+
+                Set<Integer> daysOfOperation = new HashSet<>();
+                if (dayOfOperationMonday == null || !dayOfOperationMonday.isEmpty()) {
+                    daysOfOperation.add(1);
+                }
+                if (dayOfOperationTuesday == null || !dayOfOperationTuesday.isEmpty()) {
+                    daysOfOperation.add(2);
+                }
+                if (dayOfOperationWednesday == null || !dayOfOperationWednesday.isEmpty()) {
+                    daysOfOperation.add(3);
+                }
+                if (dayOfOperationThursday == null || !dayOfOperationThursday.isEmpty()) {
+                    daysOfOperation.add(4);
+                }
+                if (dayOfOperationFriday == null || !dayOfOperationFriday.isEmpty()) {
+                    daysOfOperation.add(5);
+                }
+                if (dayOfOperationSaturday == null || !dayOfOperationSaturday.isEmpty()) {
+                    daysOfOperation.add(6);
+                }
+                if (dayOfOperationSunday == null || !dayOfOperationSunday.isEmpty()) {
+                    daysOfOperation.add(7);
+                }
+
+//                String effectiveDate = record.get("EffectiveDate");
+                String effectiveDate = "05/01/18";
+                String[] effectiveDatePieces = effectiveDate.split("/");
+                LocalDate effectiveLocalDate = LocalDate.of(2000 + Integer.parseInt(effectiveDatePieces[2]),
+                        Integer.parseInt(effectiveDatePieces[0]),
+                        Integer.parseInt(effectiveDatePieces[1]));
+
+//                String discontinueDate = record.get("DiscontinueDate");
+                String discontinueDate = "05/10/18";
+                String[] discontinueDatePieces = discontinueDate.split("/");
+                LocalDate discontinueLocalDate = LocalDate.of(2000 + Integer.parseInt(discontinueDatePieces[2]),
+                        Integer.parseInt(discontinueDatePieces[0]),
+                        Integer.parseInt(discontinueDatePieces[1]));
+
+                Period daysBetween = Period.between(effectiveLocalDate, discontinueLocalDate);
+                for (int i = 0; i < daysBetween.getDays(); i++) {
+                    if (daysOfOperation.contains(effectiveLocalDate.plusDays(i).getDayOfWeek().getValue())) {
+
+                        LocalDateTime departureLocalDateTime = LocalDateTime.of(effectiveLocalDate.plusDays(i + variationDepartureTimeCodeOffset), departureLocalTime);
+                        OffsetDateTime departureDateTime = OffsetDateTime.of(departureLocalDateTime, departureZoneOffset);
+                        Timestamp departureTimestamp = Timestamp.valueOf(departureDateTime.atZoneSameInstant(ZoneId.of("Z")).toLocalDateTime());
+
+                        LocalDateTime arrivalLocalDateTime = LocalDateTime.of(effectiveLocalDate.plusDays(i + variationArrivalTimeCodeOffset), arrivalLocalTime);
+                        OffsetDateTime arrivalDateTime = OffsetDateTime.of(arrivalLocalDateTime, arrivalZoneOffset);
+                        Timestamp arrivalTimestamp = Timestamp.valueOf(arrivalDateTime.atZoneSameInstant(ZoneId.of("Z")).toLocalDateTime());
+
+                        // AirportDay
+                        String departureKey = departureCity + "-" + departureLocalDateTime.toLocalDate();
+                        Node departureAirportDayNode = (Node)db.execute("MERGE (a:AirportDay {key:{key}}) RETURN a",
+                                Collections.singletonMap("key", departureKey)
+                        ).columnAs("a").next();
+
+                        String arrivalKey = arrivalCity + "-" + arrivalLocalDateTime.toLocalDate();
+                        Node arrivalAirportDayNode = (Node)db.execute("MERGE (a:AirportDay {key:{key}}) RETURN a",
+                                Collections.singletonMap("key",arrivalKey)
+                        ).columnAs("a").next();
+
+                        db.execute("MATCH (a:Airport {code:{code}}), (ad:AirportDay {key:{key}}) MERGE (a)-[:HAS_DAY]->(ad)",
+                                new HashMap<String, Object>() {{
+                                    put("code", departureCity);
+                                    put("key", departureKey); }});
+
+                        db.execute("MATCH (a:Airport {code:{code}}), (ad:AirportDay {key:{key}}) MERGE (a)-[:HAS_DAY]->(ad)",
+                                new HashMap<String, Object>() {{
+                                    put("code", arrivalCity);
+                                    put("key", arrivalKey); }});
+
+                        Node leg = (Node)db.execute("CREATE (l:Leg { code:{code}, departs:{departs}, arrives:{arrives}, departs_at:{departs_at}, arrives_at:{arrives_at}, distance:{distance} }) RETURN l ",
+                                new HashMap<String, Object>() {{
+                                    put("code", airlineCode + "-" + flightNumber);
+                                    put("departs", departureTimestamp.getTime()/1000);
+                                    put("arrives", arrivalTimestamp.getTime()/1000);
+                                    put("departs_at", departureLocalDateTime.toString());
+                                    put("arrives_at", arrivalLocalDateTime.toString());
+                                    put("distance", Integer.parseInt(record.get("flightDistance")));
+                                }}).columnAs("l").next();
+
+                        departureAirportDayNode.createRelationshipTo(leg, RelationshipType.withName(arrivalCity + "_FLIGHT"));
+                        leg.createRelationshipTo(arrivalAirportDayNode, RelationshipType.withName(arrivalCity + "_FLIGHT"));
+
+                    }
+                }
+
+                if (count % TRANSACTION_LIMIT == 0) {
+                    tx.success();
+                    tx.close();
+                    tx = db.beginTx();
+                }
+            }
+
+            tx.success();
+        } catch (Exception e) {
+            System.out.println("Error on line: " +  count);
+            e.printStackTrace();
+        }
+        finally {
+            tx.close();
+        }
+
+        long timeTaken = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start);
+
+        return Stream.of(new StringResult(count + " All data imported in " + timeTaken + " seconds"));
     }
 }
