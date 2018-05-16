@@ -128,7 +128,7 @@ public class Flights {
                             PathFinder<WeightedPath> dijkstra = GraphAlgoFactory.dijkstra(pathRestrictedExpander, routeCostEvaluator, recordLimit.intValue());
                             secondTraversal(results, recordLimit.intValue(), departureAirportDay, arrivalAirport, maxDistance, dijkstra);
                         } else {
-                            log.debug("No valid paths found for " + from + " to " + to + " on " + day);
+                            log.info("No valid paths found for " + from + " to " + to + " on " + day);
                         }
                     }
                 }

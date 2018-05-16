@@ -264,7 +264,7 @@ public class Imports {
         return Stream.of(new StringResult(count + " Flights imported in " + timeTaken + " Seconds"));
     }
 
-    @Description("com.maxdemarzi.import.airports(file) | Import Airports")
+    @Description("com.maxdemarzi.import.importOneFileData(file) | Import Flights")
     @Procedure(name = "com.maxdemarzi.import.importOneFileData", mode = Mode.WRITE)
 
     public Stream<StringResult> importOneFileData(@Name("file") String file) throws IOException {
@@ -291,10 +291,9 @@ public class Imports {
                 // Legs and AirportDays
                 String airlineCode = record.get("carrier");
                 String flightNumber = record.get("flightnumber");
-//                String departureTime = String.format("%04d", Integer.parseInt(record.get("departureTimePub")));
-//                String arrivalTime = String.format("%04d", Integer.parseInt(record.get("arrivalTimePub")));
-                String variationDepartureTimeCode = record.get("departureUTCVariance");
-                String variationArrivalTimeCode = record.get("arrivalUTCVariance");
+//                String variationDepartureTimeCode = record.get("departureUTCVariance");
+                String variationDepartureTimeCode = "0";
+                String variationArrivalTimeCode = record.get("flightArrivalDayIndicator");
 
                 Integer variationDepartureTimeCodeOffset = Integer.parseInt(variationDepartureTimeCode);
                 Integer variationArrivalTimeCodeOffset = Integer.parseInt(variationArrivalTimeCode);
@@ -327,20 +326,20 @@ public class Imports {
                 String dayOfOperationSaturday = null;
                 String dayOfOperationSunday = null;
 
-                if (record.toMap().containsKey("dayOfOperationMonday"))
-                    dayOfOperationMonday = record.get("DayOfOperationMonday");
-                if (record.toMap().containsKey("DayOfOperationTuesday"))
-                    dayOfOperationTuesday = record.get("DayOfOperationTuesday");
-                if (record.toMap().containsKey("DayOfOperationWednesday"))
-                    dayOfOperationWednesday = record.get("DayOfOperationWednesday");
-                if (record.toMap().containsKey("DayOfOperationThursday"))
-                    dayOfOperationThursday = record.get("DayOfOperationThursday");
-                if (record.toMap().containsKey("DayOfOperationFriday"))
-                    dayOfOperationFriday = record.get("DayOfOperationFriday");
-                if (record.toMap().containsKey("DayOfOperationSaturday"))
-                    dayOfOperationSaturday = record.get("DayOfOperationSaturday");
-                if (record.toMap().containsKey("DayOfOperationSunday"))
-                    dayOfOperationSunday = record.get("DayOfOperationSunday");
+                if (record.toMap().containsKey("day1"))
+                    dayOfOperationMonday = record.get("day1");
+                if (record.toMap().containsKey("day2"))
+                    dayOfOperationTuesday = record.get("day2");
+                if (record.toMap().containsKey("day3"))
+                    dayOfOperationWednesday = record.get("day3");
+                if (record.toMap().containsKey("day4"))
+                    dayOfOperationThursday = record.get("day4");
+                if (record.toMap().containsKey("day5"))
+                    dayOfOperationFriday = record.get("day5");
+                if (record.toMap().containsKey("day6"))
+                    dayOfOperationSaturday = record.get("day6");
+                if (record.toMap().containsKey("day7"))
+                    dayOfOperationSunday = record.get("day7");
 
                 Set<Integer> daysOfOperation = new HashSet<>();
                 if (dayOfOperationMonday == null || !dayOfOperationMonday.isEmpty()) {
@@ -365,19 +364,17 @@ public class Imports {
                     daysOfOperation.add(7);
                 }
 
-//                String effectiveDate = record.get("EffectiveDate");
-                String effectiveDate = "05/01/18";
+                String effectiveDate = record.get("effectiveDate");
                 String[] effectiveDatePieces = effectiveDate.split("/");
-                LocalDate effectiveLocalDate = LocalDate.of(2000 + Integer.parseInt(effectiveDatePieces[2]),
-                        Integer.parseInt(effectiveDatePieces[0]),
-                        Integer.parseInt(effectiveDatePieces[1]));
+                LocalDate effectiveLocalDate = LocalDate.of(Integer.parseInt(effectiveDatePieces[2]),
+                        Integer.parseInt(effectiveDatePieces[1]),
+                        Integer.parseInt(effectiveDatePieces[0]));
 
-//                String discontinueDate = record.get("DiscontinueDate");
-                String discontinueDate = "05/10/18";
+                String discontinueDate = record.get("discontinuedDate");
                 String[] discontinueDatePieces = discontinueDate.split("/");
-                LocalDate discontinueLocalDate = LocalDate.of(2000 + Integer.parseInt(discontinueDatePieces[2]),
-                        Integer.parseInt(discontinueDatePieces[0]),
-                        Integer.parseInt(discontinueDatePieces[1]));
+                LocalDate discontinueLocalDate = LocalDate.of(Integer.parseInt(discontinueDatePieces[2]),
+                        Integer.parseInt(discontinueDatePieces[1]),
+                        Integer.parseInt(discontinueDatePieces[0]));
 
                 Period daysBetween = Period.between(effectiveLocalDate, discontinueLocalDate);
                 for (int i = 0; i < daysBetween.getDays(); i++) {
@@ -421,6 +418,8 @@ public class Imports {
                                     put("arrives_at", arrivalLocalDateTime.toString());
                                     put("distance", Integer.parseInt(record.get("flightDistance")));
                                 }}).columnAs("l").next();
+                        log.error(departureLocalDateTime.toString());
+                        log.error(arrivalDateTime.toString());
 
                         departureAirportDayNode.createRelationshipTo(leg, RelationshipType.withName(arrivalCity + "_FLIGHT"));
                         leg.createRelationshipTo(arrivalAirportDayNode, RelationshipType.withName(arrivalCity + "_FLIGHT"));
